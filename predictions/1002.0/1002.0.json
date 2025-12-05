@@ -1,0 +1,17 @@
+{
+    "sample_id": 1002,
+    "lat": 28.7041,
+    "lon": 77.1025,
+    "has_solar": false,
+    "confidence": 0.0,
+    "pv_area_sqm_est": 0.0,
+    "buffer_radius_sqft": 2400,
+    "qc_status": "VERIFIABLE",
+    "bbox_or_mask": "",
+    "image_metadata": {
+        "source": "Google Maps Static API",
+        "size": "1024x1024",
+        "meters_per_px": 0.06547,
+        "quality_check": "Good quality"
+    }
+}

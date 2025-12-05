@@ -1,227 +1,126 @@
-# EcoInnovators Ideathon 2026 - Rooftop Solar Detection
 
-AI-powered pipeline for automated verification of rooftop solar panel installations using satellite imagery and deep learning.
+# Solar Panel Detection Pipeline
+**EcoInnovators Ideathon 2026 - College Edition**
 
-## 🎯 Project Overview
+## 1. Executive Summary
 
-This system automatically detects and verifies rooftop solar panel installations from satellite images at given coordinates. It's designed for governance and subsidy verification under India's PM Surya Ghar: Muft Bijli Yojana scheme.
+This repository contains an end-to-end computer vision pipeline developed for the automated remote verification of rooftop solar installations (PM Surya Ghar: Muft Bijli Yojana). The system accepts geographic coordinates, retrieves high-resolution satellite imagery, executes deep learning inference, and performs geospatial validation to confirm the presence of photovoltaic systems.
 
-### Key Features
-- ✅ Automated satellite image retrieval via Google Maps API
-- ✅ SAHI (Slicing Aided Hyper Inference) for accurate detection
-- ✅ Dual buffer zone checking (1200 & 2400 sq.ft)
-- ✅ Panel area estimation in square meters
-- ✅ Quality control & verifiability assessment
-- ✅ Audit-ready visualization overlays
+The solution utilizes a custom-trained YOLOv8-Medium model integrated with Slicing Aided Hyper Inference (SAHI) to detect small-scale objects in satellite imagery. It adheres to specific auditability requirements, including dynamic buffer zone analysis (1200 sq.ft and 2400 sq.ft) and automated quality control.
 
-## 📁 Repository Structure
 
-```
-├── pipeline_code/
-│   └── inference.py          # Main inference script
-├── environment_details/
-│   ├── requirements.txt      # pip dependencies
-│   ├── environment.yml       # conda environment
-│   └── python_version.txt    # Python version info
-├── trained_model/
-│   └── best.pt              # YOLOv8 trained model
-├── model_card/
-│   └── model_card.pdf       # Model documentation
-├── prediction_files/
-│   └── all_predictions.json # Sample predictions
-├── artifacts/
-│   └── *_overlay.png        # Visualization outputs
-├── model_training_logs/
-│   └── training_logs.csv    # Training metrics
-├── input_folder/
-│   └── input_data.xlsx      # Sample input format
-└── README.md
-```
+## 2. Installation and Environment Setup
 
-## 🚀 Quick Start
+The pipeline is optimized for **Python 3.10.1**.
 
-### Prerequisites
-
-- Python 3.9 or higher
-- CUDA-capable GPU (recommended but not required)
-- Google Maps Static API key
-
-### Installation
-
-#### Option 1: Using pip
+### Option A: Standard Pip Installation
+If using a standard Python environment:
 
 ```bash
-# Clone repository
-git clone https://github.com/your-username/ecoinnovators-2026.git
-cd ecoinnovators-2026
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+# Ensure Python 3.10.1 is active
 pip install -r environment_details/requirements.txt
 ```
 
-#### Option 2: Using conda
+### API Configuration
+Create a `.env` file in the root directory. You must provide a valid Google Maps Static API Key for image retrieval.
 
-```bash
-# Clone repository
-git clone https://github.com/your-username/ecoinnovators-2026.git
-cd ecoinnovators-2026
+```ini
+# Google Maps API Configuration
+GOOGLE_MAPS_API_KEY=your_api_key_here
 
-# Create conda environment
-conda env create -f environment_details/environment.yml
-conda activate ecoinnovators
+MODEL_PATH=model/best.pt
+CONFIDENCE_THRESHOLD=0.25
+ZOOM_LEVEL=20
+INPUT_FOLDER=input_folder
+OUTPUT_FOLDER=predictions
 ```
 
-### Configuration
+## 3. Usage Instructions
 
-1. **Add your Google Maps API Key:**
-   
-   Edit `pipeline_code/inference.py` and update:
-   ```python
-   GOOGLE_MAPS_API_KEY = "YOUR_API_KEY_HERE"
-   ```
+### Step 1: Prepare Input Data
+Place your input Excel file (`.xlsx`) inside the `input_folder/`.
+The file must contain the following columns:
+*   `sample_id`: Unique identifier for the location.
+*   `latitude`: WGS84 latitude.
+*   `longitude`: WGS84 longitude.
 
-2. **Ensure model file exists:**
-   
-   Place your trained model file (`best.pt`) in the `trained_model/` directory.
+### Step 2: Execute Pipeline
+Run the main script from the root directory:
 
-### Running Inference
+```bash
+python main.py
+```
 
-1. **Prepare input file:**
+### Step 3: Access Results
+The system will process the images and save results in the `predictions/`.
+*   **JSON:** Contains the binary classification (`has_solar`), confidence score, estimated area ($m^2$), and QC status.
+*   **Overlay Image:** A visualization showing the buffer zones and detected panels.
 
-   Create an Excel file at `input_folder/input_data.xlsx` with columns:
-   - `sample_id`: Unique identifier for each location
-   - `latitude`: Latitude coordinate (WGS84)
-   - `longitude`: Longitude coordinate (WGS84)
+## 4. Technical Architecture and Logic
 
-   Example:
-   ```
-   sample_id | latitude  | longitude
-   ----------|-----------|----------
-   1001      | 23.908454 | 71.182617
-   1002      | 28.704100 | 77.102500
-   ```
+The pipeline operates in four distinct phases to ensure accuracy and explainability.
 
-2. **Run the pipeline:**
+### Phase 1: Data Acquisition
+The system accepts `(lat, lon)` coordinates and queries the Google Maps Static API. It retrieves a $1024 \times 1024$ pixel satellite image at Zoom Level 20. This zoom level provides sufficient Ground Sampling Distance (GSD) to resolve individual PV modules.
 
-   ```bash
-   cd pipeline_code
-   python inference.py
-   ```
+### Phase 2: Quality Control (QC) Layer
+Before inference, the `ImageQualityChecker` module analyzes the image to prevent false negatives caused by poor data quality.
+*   **Brightness Check:** Detects images that are too dark (shadows) or overexposed.
+*   **Cloud Detection:** Analyzes pixel intensity distribution to detect cloud occlusion.
+*   **Outcome:** If an image fails these checks, the status is set to `NOT_VERIFIABLE`.
 
-3. **Check outputs:**
+### Phase 3: Slicing Aided Hyper Inference (SAHI)
+To detect small objects effectively, the pipeline uses SAHI. The `1024px` input image is sliced into overlapping $640 \times 640$ windows. The YOLOv8 model processes each slice independently. Predictions are then merged using Non-Maximum Suppression (NMS) to reconstruct the full detection map.
 
-   Results will be saved in `output_folder/`:
-   - `{sample_id}.json` - Individual predictions
-   - `{sample_id}_overlay.png` - Visualization with detections
-   - `all_predictions.json` - Combined results
+### Phase 4: Geometric Verification (Buffer Logic)
+The system implements the geospatial logic defined in the challenge requirements:
+1.  **Buffer Zone 1 (1200 sq.ft):** The system calculates a pixel radius corresponding to 1200 sq.ft centered on the target coordinate. If a panel overlaps this area, it is confirmed.
+2.  **Buffer Zone 2 (2400 sq.ft):** If no panel is found in Zone 1, the search radius expands to 2400 sq.ft.
+3.  **Area Estimation:** If a panel is detected, its pixel area is converted to square meters based on the latitude-specific projection scale.
 
-## 📊 Output Format
+## 6. Output Artifacts
 
-Each sample generates a JSON file with the following structure:
+### JSON Output
+The `all_predictions.json` file contains structured data for automated auditing:
 
 ```json
 {
     "sample_id": 1001,
-    "lat": 23.908454,
-    "lon": 71.182617,
+    "lat": 12.9716,
+    "lon": 77.5946,
     "has_solar": true,
-    "confidence": 0.8945,
-    "pv_area_sqm_est": 45.23,
+    "confidence": 0.915,
+    "pv_area_sqm_est": 24.5,
     "buffer_radius_sqft": 1200,
     "qc_status": "VERIFIABLE",
-    "bbox_or_mask": "[[x1,y1], [x2,y2], ...]",
+    "bbox_or_mask": "[[267.0, 442.13], [933.92, 442.13], [933.92, 520.62], [267.0, 520.62], [267.0, 442.13]]",
     "image_metadata": {
         "source": "Google Maps Static API",
-        "size": "1024x1024",
-        "meters_per_px": 0.29858,
         "quality_check": "Good quality"
     }
 }
 ```
 
-### QC Status Values
-- **VERIFIABLE**: Clear image with definitive result
-- **NOT_VERIFIABLE**: Poor image quality (clouds, shadows, low resolution)
+### Visual Verification
+The system generates overlay images (`sample_id_overlay.png`) for manual review:
+*   **Blue Circle:** Indicates the buffer zone used for verification.
+*   **Yellow Outline:** Indicates all detected solar panels.
+*   **Green Fill:** Indicates the specific panel that triggered the positive verification.
 
-## 🔧 Configuration Parameters
+![Output Example](predictions\1001.0\1001.0_overlay.png)
 
-Key parameters in `inference.py`:
+## 7. Model Performance
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `ZOOM_LEVEL` | 20 | Google Maps zoom level |
-| `FINAL_IMAGE_SIZE` | 1024 | Output image dimensions (pixels) |
-| `CONFIDENCE_THRESHOLD` | 0.25 | Minimum detection confidence |
-| `BUFFER_RADIUS_1_SQFT` | 1200 | First buffer zone (sq.ft) |
-| `BUFFER_RADIUS_2_SQFT` | 2400 | Second buffer zone (sq.ft) |
-| `SLICE_HEIGHT` | 640 | SAHI slice height |
-| `SLICE_WIDTH` | 640 | SAHI slice width |
-| `OVERLAP_RATIO` | 0.2 | SAHI overlap ratio |
+The model was trained on a composite dataset combining Roboflow 100, LSGI547, and other open-source libraries.
 
-## 📈 Model Performance
+| Metric | Value | Description |
+|:-------|:------|:------------|
+| **mAP@50** | 0.915 | Mean Average Precision at 0.5 IoU |
+| **Precision** | 0.877 | Positive Predictive Value |
+| **Recall** | 0.837 | Sensitivity |
+| **F1 Score** | 0.857 | Harmonic mean of Precision and Recall |
 
-See `model_card/model_card.pdf` for detailed performance metrics including:
-- F1 Score on validation set
-- RMSE for area estimation
-- Performance across different roof types
-- Known limitations and failure modes
+## 8. License and Attribution
 
-## 🛠️ Troubleshooting
-
-### Common Issues
-
-1. **Import Error: sahi not found**
-   ```bash
-   pip install sahi==0.11.14
-   ```
-
-2. **CUDA out of memory**
-   - Reduce batch size or disable GPU in code
-   - Set `device="cpu"` in model initialization
-
-3. **API Key Error**
-   - Verify your Google Maps API key is valid
-   - Ensure Static Maps API is enabled in Google Cloud Console
-
-4. **Model file not found**
-   - Ensure `best.pt` is in `trained_model/` directory
-   - Check file path in configuration
-
-## 📝 Training Data Sources
-
-Models were trained using the following datasets:
-1. [Alfred Weber Institute Dataset](https://universe.roboflow.com/...) - 5,000 annotated images
-2. [LSGI547 Project](https://universe.roboflow.com/...) - 3,200 images
-3. [Piscinas Y Tenistable](https://universe.roboflow.com/...) - 1,800 images
-
-All datasets are publicly available under permissive licenses.
-
-## 📄 License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
-## 👥 Team
-
-EcoInnovators 2026 Team
-- Team Member 1
-- Team Member 2
-- Team Member 3
-
-## 🙏 Acknowledgments
-
-- PM Surya Ghar: Muft Bijli Yojana initiative
-- Roboflow community for open datasets
-- SAHI library developers
-- Ultralytics YOLOv8 team
-
-## 📧 Contact
-
-For questions or issues, please open a GitHub issue or contact: your.email@example.com
-
----
-
-**Note**: This is a competition submission for EcoInnovators Ideathon 2026. Submission deadline: December 7, 2025, 11:59 PM.
+*   **Code License:** MIT License.
+*   **Imagery:** Google Maps Static API. Usage must comply with Google's Terms of Service.
