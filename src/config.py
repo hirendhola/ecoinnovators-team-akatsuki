@@ -15,12 +15,12 @@ class Config:
     GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY', '')
     
     # Model Configuration
-    MODEL_PATH = os.getenv('MODEL_PATH', 'best.pt')
+    MODEL_PATH = os.getenv('MODEL_PATH', 'model/best.pt')
     CONFIDENCE_THRESHOLD = float(os.getenv('CONFIDENCE_THRESHOLD', 0.25))
     
     # Directory Paths
     INPUT_FOLDER = Path(os.getenv('INPUT_FOLDER', 'input_folder'))
-    OUTPUT_FOLDER = Path(os.getenv('OUTPUT_FOLDER', 'output_folder'))
+    OUTPUT_FOLDER = Path(os.getenv('OUTPUT_FOLDER', 'predictions'))
     INPUT_FILENAME = "input_data.xlsx"
     
     # Image Settings
