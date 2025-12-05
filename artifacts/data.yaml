@@ -1,0 +1,6 @@
+names:
+  0: solar_panel
+nc: 1
+path: /content/datasets/combined_solar
+train: train/images
+val: valid/images
