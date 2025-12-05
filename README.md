@@ -107,7 +107,7 @@ The system generates overlay images (`sample_id_overlay.png`) for manual review:
 *   **Yellow Outline:** Indicates all detected solar panels.
 *   **Green Fill:** Indicates the specific panel that triggered the positive verification.
 
-![Output Example](predictions\1001.0\1001.0_overlay.png)
+![Output Example](./predictions/1001.0/1001.0_overlay.png)
 
 ## 7. Model Performance
 
